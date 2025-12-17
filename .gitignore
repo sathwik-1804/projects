@@ -11,3 +11,15 @@ target/
 *.log*.zip
 *.jar
 /ThreatRaptor/target/
+
+
+# PHP / XAMPP
+.env
+config.php
+
+# Database
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
