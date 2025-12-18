@@ -1,0 +1,11 @@
+create database ChatbotMusic;
+use ChatbotMusic;
+
+create table register(username varchar(30) primary key,
+password varchar(30),
+contact varchar(12),
+email varchar(30),
+address varchar(40));
+
+create table music(music_name varchar(50), filename varchar(50), description varchar(500));
+
