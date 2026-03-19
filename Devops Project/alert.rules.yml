@@ -1,0 +1,71 @@
+groups:
+  - name: cpu_alerts
+    rules:
+      - alert: HighCPUUsage
+        expr: 100 - (avg(rate(windows_cpu_time_total{mode="idle"}[5m])) * 100) > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU Usage on Windows Host"
+          description: "CPU above 80%. Value: {{ $value | printf \"%.1f\" }}%"
+
+      - alert: CriticalCPUUsage
+        expr: 100 - (avg(rate(windows_cpu_time_total{mode="idle"}[5m])) * 100) > 95
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CRITICAL CPU on Windows Host"
+          description: "CPU above 95%. Value: {{ $value | printf \"%.1f\" }}%"
+
+  - name: memory_alerts
+    rules:
+      - alert: HighMemoryUsage
+        expr: 100 - ((windows_os_physical_memory_free_bytes / windows_cs_physical_memory_bytes) * 100) > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Memory on Windows Host"
+          description: "Memory above 80%. Value: {{ $value | printf \"%.1f\" }}%"
+
+  - name: disk_alerts
+    rules:
+      - alert: DiskSpaceWarning
+        expr: (windows_logical_disk_free_bytes / windows_logical_disk_size_bytes) * 100 < 20
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low Disk on {{ $labels.volume }}"
+          description: "Drive {{ $labels.volume }} less than 20% free."
+
+      - alert: DiskSpaceCritical
+        expr: (windows_logical_disk_free_bytes / windows_logical_disk_size_bytes) * 100 < 10
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CRITICAL Disk on {{ $labels.volume }}"
+          description: "Drive {{ $labels.volume }} less than 10% free!"
+
+  - name: system_alerts
+    rules:
+      - alert: HostDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Host {{ $labels.instance }} DOWN"
+          description: "Target {{ $labels.job }} unreachable for 1 minute."
+
+      - alert: WindowsServiceDown
+        expr: windows_service_state{state="running"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Windows Service Down: {{ $labels.name }}"
+          description: "Service {{ $labels.name }} is not running."

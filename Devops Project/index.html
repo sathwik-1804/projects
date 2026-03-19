@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DevOps — Live Status</title>
+<style>
+:root{--bg:#0d1117;--s:#161b22;--s2:#1c2128;--bd:rgba(255,255,255,0.08);
+  --text:#e6edf3;--muted:#7d8590;--green:#3fb950;--yellow:#d29922;
+  --red:#f85149;--blue:#58a6ff;--purple:#bc8cff;--orange:#ffa657;
+  --font:'Cascadia Code','Fira Code','JetBrains Mono',monospace;--sans:system-ui,-apple-system,sans-serif;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;line-height:1.5;}
+a{color:var(--blue);text-decoration:none;}a:hover{text-decoration:underline;}
+/* Header */
+header{background:var(--s);border-bottom:1px solid var(--bd);padding:13px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px;}
+.pr{position:relative;width:10px;height:10px;}
+.pr::before{content:'';position:absolute;inset:0;border-radius:50%;background:var(--green);}
+.pr::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:2px solid var(--green);animation:ring 2s infinite;opacity:0;}
+@keyframes ring{0%{transform:scale(.7);opacity:.9}100%{transform:scale(1.7);opacity:0}}
+.pr.disconnected::before{background:var(--red);}
+.pr.disconnected::after{border-color:var(--red);}
+.hdr-r{display:flex;align-items:center;gap:8px;}
+.badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;}
+.bg{background:rgba(63,185,80,.15);color:var(--green);border:1px solid rgba(63,185,80,.3);}
+.by{background:rgba(210,153,34,.15);color:var(--yellow);border:1px solid rgba(210,153,34,.3);}
+.br{background:rgba(248,81,73,.15);color:var(--red);border:1px solid rgba(248,81,73,.3);}
+.bb{background:rgba(88,166,255,.15);color:var(--blue);border:1px solid rgba(88,166,255,.3);}
+.conn-dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:4px;}
+#conn-status{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px;}
+#clock{font-family:var(--font);font-size:11px;color:var(--muted);}
+.cbtn{background:none;border:1px solid var(--bd);color:var(--muted);padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer;transition:all .15s;}
+.cbtn:hover{border-color:var(--blue);color:var(--text);}
+.cbtn.active{background:rgba(88,166,255,.15);border-color:var(--blue);color:var(--blue);}
+/* Layout */
+.layout{max-width:1300px;margin:0 auto;padding:20px 24px;display:flex;flex-direction:column;gap:18px;}
+.sec-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;}
+.sec-t{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);}
+/* Metrics grid */
+.mgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;}
+.mc{background:var(--s);border:1px solid var(--bd);border-radius:8px;padding:13px 15px;}
+.ml{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:4px;}
+.mv{font-size:20px;font-weight:700;font-family:var(--font);}
+.ms{font-size:9px;color:var(--muted);margin-top:2px;}
+.ok{color:var(--green);}.wn{color:var(--yellow);}.cr{color:var(--red);}.if{color:var(--blue);}
+/* Services */
+.sgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;}
+.sc{background:var(--s);border:1px solid var(--bd);border-radius:8px;padding:11px 13px;display:flex;flex-direction:column;gap:5px;transition:border-color .3s;}
+.sc.up{border-color:rgba(63,185,80,.25);}
+.sc.degraded{border-color:rgba(210,153,34,.35);}
+.sc.down{border-color:rgba(248,81,73,.35);}
+.sc-top{display:flex;align-items:center;justify-content:space-between;}
+.dot{width:7px;height:7px;border-radius:50%;}
+.dot.up{background:var(--green);box-shadow:0 0 5px rgba(63,185,80,.6);}
+.dot.degraded{background:var(--yellow);}
+.dot.down{background:var(--red);box-shadow:0 0 5px rgba(248,81,73,.5);}
+.sn{font-size:11px;font-weight:600;}
+.sp{font-family:var(--font);font-size:10px;color:var(--muted);}
+.sm{font-size:10px;color:var(--muted);}
+/* Alerts strip */
+.alert-strip{display:flex;flex-direction:column;gap:6px;}
+.alert-row{background:var(--s);border:1px solid var(--bd);border-radius:7px;padding:9px 14px;display:flex;align-items:center;gap:10px;font-size:12px;}
+.alert-row.crit{border-color:rgba(248,81,73,.3);background:rgba(248,81,73,.05);}
+.alert-row.warning{border-color:rgba(210,153,34,.3);background:rgba(210,153,34,.05);}
+.alert-row.info{border-color:rgba(88,166,255,.25);}
+.alert-name{font-weight:600;min-width:180px;}
+.alert-summary{flex:1;color:var(--muted);}
+.alert-inst{font-family:var(--font);font-size:10px;color:var(--muted);}
+/* Log panel */
+.lp{background:var(--s);border:1px solid var(--bd);border-radius:10px;overflow:hidden;}
+.lt{background:var(--s2);border-bottom:1px solid var(--bd);padding:9px 13px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.tabs{display:flex;gap:2px;background:rgba(0,0,0,.4);border-radius:5px;padding:2px;}
+.tab{padding:3px 10px;border-radius:3px;font-size:11px;font-weight:600;cursor:pointer;color:var(--muted);border:none;background:none;transition:all .12s;}
+.tab.a{background:var(--s);color:var(--text);}
+.tab:hover:not(.a){color:var(--text);}
+.sr{flex:1;min-width:150px;background:rgba(0,0,0,.3);border:1px solid var(--bd);border-radius:5px;padding:4px 9px;color:var(--text);font-size:12px;font-family:var(--font);outline:none;}
+.sr:focus{border-color:var(--blue);}
+.sr::placeholder{color:var(--muted);}
+.fbs{display:flex;gap:3px;}
+.fb{padding:3px 8px;border-radius:4px;font-size:9px;font-weight:700;cursor:pointer;border:1px solid transparent;opacity:.5;background:none;}
+.fb.a{opacity:1;}
+.fb.fa{border-color:var(--bd);color:var(--text);}.fb.fa.a{background:rgba(255,255,255,.1);}
+.fb.fc{border-color:rgba(248,81,73,.4);color:var(--red);}.fb.fc.a{background:rgba(248,81,73,.15);}
+.fb.fw{border-color:rgba(210,153,34,.4);color:var(--yellow);}.fb.fw.a{background:rgba(210,153,34,.15);}
+.fb.fi{border-color:rgba(88,166,255,.4);color:var(--blue);}.fb.fi.a{background:rgba(88,166,255,.15);}
+.lcontrols{display:flex;gap:5px;margin-left:auto;align-items:center;}
+.lcnt{font-size:10px;color:var(--muted);font-family:var(--font);}
+.lb{height:420px;overflow-y:auto;font-family:var(--font);font-size:11px;line-height:1.65;padding:5px 0;}
+.lb::-webkit-scrollbar{width:5px;}
+.lb::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px;}
+.lb::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.2);}
+.ll{display:flex;padding:1.5px 13px;cursor:default;}
+.ll:hover{background:rgba(255,255,255,.04);}
+.ll.h{display:none;}
+.ll.new{animation:fi .5s ease;}
+@keyframes fi{from{opacity:0;background:rgba(88,166,255,.07)}to{opacity:1}}
+.lts{color:#3a4046;min-width:74px;flex-shrink:0;}
+.lhn{color:#484f58;min-width:64px;flex-shrink:0;font-size:10px;padding-top:1px;}
+.lpg{min-width:94px;flex-shrink:0;}
+.lpg.auth{color:#bc8cff;}.lpg.kernel{color:#ffa657;}.lpg.syslog{color:#58a6ff;}.lpg.docker{color:#3fb950;}.lpg.nginx{color:#79c0ff;}
+.llv{flex-shrink:0;width:32px;text-align:center;font-size:9px;font-weight:700;border-radius:3px;margin-right:6px;}
+.lvc{background:rgba(248,81,73,.2);color:var(--red);}
+.lvw{background:rgba(210,153,34,.2);color:var(--yellow);}
+.lvi{background:rgba(88,166,255,.2);color:var(--blue);}
+.lvo{background:rgba(63,185,80,.2);color:var(--green);}
+.lvd{background:rgba(255,255,255,.05);color:var(--muted);}
+.lmsg{flex:1;word-break:break-all;}
+.lmsg.mc{color:#f85149;}.lmsg.mw{color:#d29922;}.lmsg.mi{color:#e6edf3;}.lmsg.mo{color:#3fb950;}.lmsg.md{color:#3a4046;}
+.lempty{text-align:center;padding:50px;color:var(--muted);}
+.lerr{text-align:center;padding:50px;color:var(--red);font-size:12px;}
+/* Bottom two-col */
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.panel{background:var(--s);border:1px solid var(--bd);border-radius:10px;overflow:hidden;}
+.ph{background:var(--s2);border-bottom:1px solid var(--bd);padding:10px 15px;display:flex;align-items:center;justify-content:space-between;}
+.pt{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);}
+.ti{padding:10px 15px;display:flex;gap:10px;align-items:flex-start;border-bottom:1px solid var(--bd);}
+.ti:last-child{border-bottom:none;}
+.tic{font-size:14px;flex-shrink:0;padding-top:1px;}
+.tib{flex:1;}
+.tim{font-size:12px;}
+.tmt{font-size:10px;color:var(--muted);margin-top:2px;font-family:var(--font);}
+.ti.sev-crit .tim{color:var(--red);}
+.ti.sev-warn .tim{color:var(--yellow);}
+.ti.sev-ok .tim{color:var(--green);}
+.ur{padding:9px 15px;display:flex;align-items:center;gap:11px;border-bottom:1px solid var(--bd);}
+.ur:last-child{border-bottom:none;}
+.un{font-size:11px;min-width:110px;}
+.usegs{display:flex;gap:1.5px;flex:1;}
+.us{height:15px;border-radius:2px;flex:1;}
+.us-up{background:var(--green);opacity:.75;}.us-w{background:var(--yellow);opacity:.8;}.us-d{background:var(--red);opacity:.9;}
+.up-pct{font-family:var(--font);font-size:11px;color:var(--green);min-width:44px;text-align:right;}
+/* Skeleton loader */
+.skel{background:linear-gradient(90deg,var(--s2) 25%,rgba(255,255,255,.04) 50%,var(--s2) 75%);background-size:200% 100%;animation:sk 1.4s infinite;}
+@keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
+/* Updated indicator */
+#updated{font-size:10px;color:var(--muted);font-family:var(--font);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="pr" id="pulse"></div>
+    DevOps Monitoring Stack
+  </div>
+  <div class="hdr-r">
+    <span id="conn-status"><span class="conn-dot" id="conn-dot" style="background:var(--yellow)"></span>Connecting...</span>
+    <span id="clock"></span>
+    <span class="badge bg" id="overall-badge">Checking...</span>
+    <button class="cbtn" onclick="manualRefresh()">↻ Refresh</button>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- Metrics -->
+  <div>
+    <div class="sec-hdr">
+      <span class="sec-t">System Metrics — Live from Prometheus</span>
+      <span id="updated">—</span>
+    </div>
+    <div class="mgrid">
+      <div class="mc"><div class="ml">CPU Usage</div><div class="mv wn" id="m-cpu">—</div><div class="ms" id="m-load">load —</div></div>
+      <div class="mc"><div class="ml">Memory</div><div class="mv ok" id="m-mem">—</div><div class="ms" id="m-memraw">— used</div></div>
+      <div class="mc"><div class="ml">Disk</div><div class="mv ok" id="m-disk">—</div><div class="ms" id="m-diskraw">root partition</div></div>
+      <div class="mc"><div class="ml">Network RX</div><div class="mv if" id="m-net">—</div><div class="ms" id="m-nettx">TX —</div></div>
+      <div class="mc"><div class="ml">Uptime</div><div class="mv ok" id="m-uptime">—</div><div class="ms" id="m-cores">— CPU cores</div></div>
+      <div class="mc"><div class="ml">Containers</div><div class="mv ok" id="m-containers">—</div><div class="ms">running now</div></div>
+    </div>
+  </div>
+
+  <!-- Services -->
+  <div>
+    <div class="sec-hdr"><span class="sec-t">Service Health — Real-time checks</span><span class="sec-t" id="svc-summary">checking...</span></div>
+    <div class="sgrid" id="svcs"></div>
+  </div>
+
+  <!-- Active Alerts from Alertmanager -->
+  <div id="alerts-section" style="display:none">
+    <div class="sec-hdr"><span class="sec-t">Active Alerts — Alertmanager</span><span class="badge br" id="alert-count">0</span></div>
+    <div class="alert-strip" id="alerts-list"></div>
+  </div>
+
+  <!-- Live Logs from Loki -->
+  <div>
+    <div class="sec-hdr">
+      <span class="sec-t">System Logs — Live from Loki</span>
+      <span class="lcnt" id="log-cnt">0 entries</span>
+    </div>
+    <div class="lp">
+      <div class="lt">
+        <div class="tabs">
+          <button class="tab a" onclick="sw('all',this)">All</button>
+          <button class="tab" onclick="sw('auth',this)">Auth</button>
+          <button class="tab" onclick="sw('kernel',this)">Kernel</button>
+          <button class="tab" onclick="sw('syslog',this)">Syslog</button>
+          <button class="tab" onclick="sw('docker',this)">Docker</button>
+          <button class="tab" onclick="sw('nginx',this)">Nginx</button>
+        </div>
+        <input class="sr" id="sr" type="text" placeholder="Search real logs..." oninput="fl()">
+        <div class="fbs">
+          <button class="fb fa a" onclick="sl('all',this)">ALL</button>
+          <button class="fb fc" onclick="sl('crit',this)">CRIT</button>
+          <button class="fb fw" onclick="sl('warn',this)">WARN</button>
+          <button class="fb fi" onclick="sl('info',this)">INFO</button>
+        </div>
+        <div class="lcontrols">
+          <button class="cbtn active" id="asbtn" onclick="tas()">⬇ Auto-scroll</button>
+          <button class="cbtn" onclick="clearLogs()">Clear</button>
+          <button class="cbtn" onclick="exportLogs()">↓ Export</button>
+        </div>
+      </div>
+      <div class="lb" id="lb">
+        <div class="lempty" id="lempty">Connecting to Loki...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Threats + Uptime -->
+  <div class="two">
+    <div class="panel">
+      <div class="ph"><span class="pt">Threat Detection — from real logs</span><span class="badge" id="threat-badge">—</span></div>
+      <div id="tlist"><div style="padding:20px;color:var(--muted);font-size:12px;">Analyzing logs...</div></div>
+    </div>
+    <div class="panel">
+      <div class="ph"><span class="pt">Service Latency History</span></div>
+      <div id="ulist"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── CONFIG ──────────────────────────────────
+const API   = 'http://localhost:8888';
+const WS    = 'ws://localhost:8888/ws';
+const POLL  = 10000; // fallback polling interval ms
+
+// ── STATE ───────────────────────────────────
+let allLogs=[], activeTab='all', activeLvl='all', autoScroll=true;
+let wsConn=null, pollTimer=null, connected=false;
+let latencyHistory = {}; // service name -> last 30 latencies
+
+// ── WEBSOCKET CONNECTION ─────────────────────
+function connectWS() {
+  try {
+    wsConn = new WebSocket(WS);
+    wsConn.onopen = () => {
+      setConnStatus(true);
+      if(pollTimer){ clearInterval(pollTimer); pollTimer=null; }
+    };
+    wsConn.onmessage = (e) => {
+      try {
+        const pkt = JSON.parse(e.data);
+        if(pkt.type === 'update') applyState(pkt.data);
+      } catch(err){}
+    };
+    wsConn.onclose = () => {
+      setConnStatus(false);
+      // Fallback to REST polling
+      if(!pollTimer) pollTimer = setInterval(pollREST, POLL);
+      setTimeout(connectWS, 5000);
+    };
+    wsConn.onerror = () => { wsConn.close(); };
+  } catch(e) {
+    setConnStatus(false);
+    if(!pollTimer) pollTimer = setInterval(pollREST, POLL);
+  }
+  // Keepalive ping
+  setInterval(()=>{ if(wsConn && wsConn.readyState===1) wsConn.send('ping'); }, 25000);
+}
+
+async function pollREST() {
+  try {
+    const r = await fetch(`${API}/api/status`);
+    if(!r.ok) throw new Error('bad response');
+    applyState(await r.json());
+    setConnStatus(true);
+  } catch(e) {
+    setConnStatus(false);
+  }
+}
+
+function setConnStatus(ok) {
+  connected = ok;
+  const dot = document.getElementById('conn-dot');
+  const txt = document.getElementById('conn-status');
+  const pulse = document.getElementById('pulse');
+  if(ok) {
+    dot.style.background = 'var(--green)';
+    txt.innerHTML = `<span class="conn-dot" id="conn-dot" style="background:var(--green)"></span>Live`;
+    pulse.classList.remove('disconnected');
+  } else {
+    dot.style.background = 'var(--red)';
+    txt.innerHTML = `<span class="conn-dot" id="conn-dot" style="background:var(--red)"></span>Disconnected`;
+    pulse.classList.add('disconnected');
+  }
+}
+
+// ── APPLY STATE ──────────────────────────────
+function applyState(data) {
+  if(data.metrics)    renderMetrics(data.metrics);
+  if(data.services)   renderServices(data.services);
+  if(data.logs)       renderLogs(data.logs);
+  if(data.alerts)     renderAlerts(data.alerts);
+  if(data.threats)    renderThreats(data.threats);
+  if(data.updated_at) document.getElementById('updated').textContent = 'Updated ' + new Date(data.updated_at).toLocaleTimeString();
+  renderLatencyHistory(data.services || []);
+}
+
+// ── METRICS ─────────────────────────────────
+function renderMetrics(m) {
+  const cpu = m.cpu_percent || 0;
+  const mem = m.memory_percent || 0;
+  const disk= m.disk_percent || 0;
+  const el = id => document.getElementById(id);
+  el('m-cpu').textContent = cpu + '%';
+  el('m-cpu').className   = 'mv ' + (cpu>80?'cr':cpu>60?'wn':'ok');
+  el('m-load').textContent= `load ${m.load_1||'—'} / ${m.load_5||'—'} / ${m.load_15||'—'}`;
+  el('m-mem').textContent = mem + '%';
+  el('m-mem').className   = 'mv ' + (mem>85?'cr':mem>70?'wn':'ok');
+  el('m-memraw').textContent = (m.memory_used||'—') + ' used';
+  el('m-disk').textContent= disk + '%';
+  el('m-disk').className  = 'mv ' + (disk>90?'cr':disk>75?'wn':'ok');
+  el('m-diskraw').textContent = (m.disk_used||'—') + ' used';
+  el('m-net').textContent = m.net_rx || '—';
+  el('m-nettx').textContent = 'TX ' + (m.net_tx||'—');
+  el('m-uptime').textContent = m.uptime || '—';
+  el('m-cores').textContent  = (m.cpu_cores||'—') + ' CPU cores';
+  el('m-containers').textContent = m.containers_running ?? '—';
+}
+
+// ── SERVICES ─────────────────────────────────
+function renderServices(services) {
+  const c = document.getElementById('svcs'); c.innerHTML='';
+  let up=0, total=services.length;
+  services.forEach(s => {
+    if(s.status==='up') up++;
+    const d = document.createElement('div');
+    d.className = `sc ${s.status}`;
+    const ms = s.latency != null ? s.latency+'ms' : 'timeout';
+    const msColor = s.latency==null?'var(--red)':s.latency>500?'var(--yellow)':'var(--muted)';
+    d.innerHTML=`
+      <div class="sc-top"><div class="dot ${s.status}"></div><div class="sm" style="color:${msColor}">${ms}</div></div>
+      <div class="sn">${s.name}</div>
+      <div class="sp">:${s.port}</div>
+    `;
+    c.appendChild(d);
+  });
+  document.getElementById('svc-summary').textContent = `${up}/${total} up`;
+  const b = document.getElementById('overall-badge');
+  if(up===total){ b.textContent='All Systems Operational'; b.className='badge bg'; }
+  else if(up>=total-1){ b.textContent='Degraded'; b.className='badge by'; }
+  else { b.textContent='Outage'; b.className='badge br'; }
+}
+
+// ── ALERTS ───────────────────────────────────
+function renderAlerts(alerts) {
+  const sec = document.getElementById('alerts-section');
+  const list = document.getElementById('alerts-list');
+  if(!alerts.length){ sec.style.display='none'; return; }
+  sec.style.display='block';
+  document.getElementById('alert-count').textContent = alerts.length + ' active';
+  list.innerHTML='';
+  alerts.forEach(a => {
+    const d=document.createElement('div');
+    d.className=`alert-row ${a.severity}`;
+    d.innerHTML=`
+      <span class="badge ${a.severity==='critical'?'br':a.severity==='warning'?'by':'bb'}">${a.severity}</span>
+      <span class="alert-name">${esc(a.name)}</span>
+      <span class="alert-summary">${esc(a.summary)}</span>
+      <span class="alert-inst">${esc(a.instance)}</span>
+    `;
+    list.appendChild(d);
+  });
+}
+
+// ── LOGS ─────────────────────────────────────
+const LM = {
+  crit:{bg:'lvc',msg:'mc',lb:'CRIT'},
+  warn:{bg:'lvw',msg:'mw',lb:'WARN'},
+  info:{bg:'lvi',msg:'mi',lb:'INFO'},
+  ok:  {bg:'lvo',msg:'mo',lb:'OK'},
+  debug:{bg:'lvd',msg:'md',lb:'DBG'}
+};
+
+function renderLogs(logs) {
+  if(!logs||!logs.length) return;
+  const lb = document.getElementById('lb');
+  const em = document.getElementById('lempty');
+  if(em) em.remove();
+
+  // Detect truly new entries (not already in DOM)
+  const existing = new Set(
+    Array.from(lb.querySelectorAll('.ll')).map(el=>el.dataset.key)
+  );
+  let added = 0;
+  logs.forEach(e => {
+    const key = e.ts+'|'+e.src+'|'+e.msg.slice(0,40);
+    if(existing.has(key)) return;
+    const lv2 = LM[e.lv]||LM.info;
+    const vis  = isVis(e);
+    const el   = document.createElement('div');
+    el.className = `ll${added<5?' new':''}${vis?'':' h'}`;
+    el.dataset.src = e.src;
+    el.dataset.lv  = e.lv;
+    el.dataset.q   = (e.msg+' '+e.pg).toLowerCase();
+    el.dataset.key = key;
+    el.innerHTML=`<span class="lts">${e.ts} </span><span class="lhn">host-01 </span><span class="lpg ${e.src}">${(e.pg+'          ').slice(0,10)} </span><span class="llv ${lv2.bg}">${lv2.lb}</span><span class="lmsg ${lv2.msg}">${esc(e.msg)}</span>`;
+    lb.appendChild(el);
+    added++;
+    allLogs.push(e);
+  });
+
+  // Trim DOM
+  while(lb.children.length>600) lb.removeChild(lb.firstChild);
+  if(allLogs.length>1500) allLogs.splice(0,300);
+
+  updCnt();
+  if(autoScroll && added>0) lb.scrollTop = lb.scrollHeight;
+}
+
+// ── THREATS ─────────────────────────────────
+function renderThreats(threats) {
+  const list = document.getElementById('tlist');
+  if(!threats||!threats.length){
+    list.innerHTML='<div style="padding:20px;color:var(--green);font-size:12px;">✅ No threats detected</div>';
+    document.getElementById('threat-badge').textContent='Clean';
+    document.getElementById('threat-badge').className='badge bg';
+    return;
+  }
+  const crits = threats.filter(t=>t.sev==='crit').length;
+  const warns  = threats.filter(t=>t.sev==='warn').length;
+  document.getElementById('threat-badge').textContent = `${crits} crit  ${warns} warn`;
+  document.getElementById('threat-badge').className = crits>0?'badge br':'badge by';
+  list.innerHTML='';
+  const icons = {crit:'🚨',warn:'⚠️',info:'ℹ️',ok:'✅'};
+  threats.forEach(t=>{
+    const d=document.createElement('div');
+    d.className=`ti sev-${t.sev}`;
+    d.innerHTML=`<div class="tic">${icons[t.sev]||'•'}</div><div class="tib"><div class="tim">${esc(t.msg)}</div><div class="tmt">${esc(t.meta||'')}</div></div>`;
+    list.appendChild(d);
+  });
+}
+
+// ── LATENCY HISTORY ─────────────────────────
+function renderLatencyHistory(services) {
+  services.forEach(s => {
+    if(s.latency!=null){
+      if(!latencyHistory[s.name]) latencyHistory[s.name]=[];
+      latencyHistory[s.name].push(s.latency);
+      if(latencyHistory[s.name].length>30) latencyHistory[s.name].shift();
+    }
+  });
+  const ul = document.getElementById('ulist'); ul.innerHTML='';
+  services.slice(0,5).forEach(s=>{
+    const hist = latencyHistory[s.name]||[];
+    const avg  = hist.length ? Math.round(hist.reduce((a,b)=>a+b,0)/hist.length) : null;
+    const max  = hist.length ? Math.max(...hist) : null;
+    const segs = Array.from({length:30},(_,i)=>{
+      const v = hist[hist.length-30+i];
+      if(v==null) return 'us-up" style="opacity:.15';
+      if(v>500)   return 'us-d';
+      if(v>200)   return 'us-w';
+      return 'us-up';
+    });
+    const d=document.createElement('div'); d.className='ur';
+    d.innerHTML=`
+      <div class="un">${s.name}</div>
+      <div class="usegs">${segs.map(x=>`<div class="us ${x}"></div>`).join('')}</div>
+      <div class="up-pct" style="min-width:64px;font-size:10px;">${avg!=null?avg+'ms avg':'—'}</div>
+    `;
+    ul.appendChild(d);
+  });
+}
+
+// ── LOG HELPERS ──────────────────────────────
+function isVis(e){
+  if(activeTab!=='all'&&e.src!==activeTab) return false;
+  if(activeLvl!=='all'&&e.lv!==activeLvl) return false;
+  const q=document.getElementById('sr').value.toLowerCase();
+  if(q&&!(e.msg+' '+e.pg).toLowerCase().includes(q)) return false;
+  return true;
+}
+function fl(){
+  const q=document.getElementById('sr').value.toLowerCase();
+  document.querySelectorAll('.ll').forEach(el=>{
+    const tOk=activeTab==='all'||el.dataset.src===activeTab;
+    const lOk=activeLvl==='all'||el.dataset.lv===activeLvl;
+    const qOk=!q||el.dataset.q.includes(q);
+    el.classList.toggle('h',!(tOk&&lOk&&qOk));
+  });
+  updCnt();
+  if(autoScroll){const lb=document.getElementById('lb');lb.scrollTop=lb.scrollHeight;}
+}
+function updCnt(){
+  const lb=document.getElementById('lb');
+  const v=lb.querySelectorAll('.ll:not(.h)').length;
+  document.getElementById('log-cnt').textContent=v+' of '+allLogs.length+' entries';
+}
+function sw(t,btn){activeTab=t;document.querySelectorAll('.tab').forEach(b=>b.classList.remove('a'));btn.classList.add('a');fl();}
+function sl(l,btn){activeLvl=l;document.querySelectorAll('.fb').forEach(b=>b.classList.remove('a'));btn.classList.add('a');fl();}
+function tas(){
+  autoScroll=!autoScroll;
+  const b=document.getElementById('asbtn');
+  b.classList.toggle('active',autoScroll);
+  b.textContent=autoScroll?'⬇ Auto-scroll':'⏸ Paused';
+}
+function clearLogs(){
+  allLogs=[];
+  document.getElementById('lb').innerHTML='<div class="lempty" id="lempty">Cleared — next poll in a few seconds...</div>';
+  updCnt();
+}
+function exportLogs(){
+  const txt=allLogs.map(e=>`${e.ts} ${e.src} ${e.pg}: [${e.lv.toUpperCase()}] ${e.msg}`).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([txt],{type:'text/plain'}));
+  a.download=`real-system-logs-${new Date().toISOString().slice(0,10)}.txt`;
+  a.click();
+}
+function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function manualRefresh(){ pollREST(); }
+
+// ── CLOCK ────────────────────────────────────
+function updClock(){
+  document.getElementById('clock').textContent=new Date().toLocaleString('en-US',
+    {month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+}
+
+// ── INIT ─────────────────────────────────────
+updClock();
+setInterval(updClock,1000);
+connectWS();
+// Initial REST poll in case WS is slow
+setTimeout(pollREST, 500);
+</script>
+</body>
+</html>
